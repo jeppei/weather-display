@@ -5,35 +5,37 @@ import android.annotation.SuppressLint;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.Context;
 import android.content.pm.ActivityInfo;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.view.WindowInsets;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.google.gson.Gson;
 
 import com.example.display.databinding.ActivityFullscreenBinding;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.IntStream;
+
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
  * status bar and navigation/system bar) with user interaction.
  */
 public class FullscreenActivity extends AppCompatActivity {
-    /**
-     * Whether or not the system UI should be auto-hidden after
-     * {@link #AUTO_HIDE_DELAY_MILLIS} milliseconds.
-     */
-    private static final boolean AUTO_HIDE = true;
-
-    /**
-     * If {@link #AUTO_HIDE} is set, the number of milliseconds to wait after
-     * user interaction before hiding the system UI.
-     */
-    private static final int AUTO_HIDE_DELAY_MILLIS = 3000;
 
     /**
      * Some older devices needs a small delay between UI widget updates
@@ -66,48 +68,15 @@ public class FullscreenActivity extends AppCompatActivity {
             }
         }
     };
-    private View mControlsView;
-    private final Runnable mShowPart2Runnable = new Runnable() {
-        @Override
-        public void run() {
-            // Delayed display of UI elements
-            ActionBar actionBar = getSupportActionBar();
-            if (actionBar != null) {
-                actionBar.show();
-            }
-            mControlsView.setVisibility(View.VISIBLE);
+
+    private final Runnable mShowPart2Runnable = () -> {
+        // Delayed display of UI elements
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.show();
         }
     };
-    private boolean mVisible;
-    private final Runnable mHideRunnable = new Runnable() {
-        @Override
-        public void run() {
-            hide();
-        }
-    };
-    /**
-     * Touch listener to use for in-layout UI controls to delay hiding the
-     * system UI. This is to prevent the jarring behavior of controls going away
-     * while interacting with activity UI.
-     */
-    private final View.OnTouchListener mDelayHideTouchListener = new View.OnTouchListener() {
-        @Override
-        public boolean onTouch(View view, MotionEvent motionEvent) {
-            switch (motionEvent.getAction()) {
-                case MotionEvent.ACTION_DOWN:
-                    if (AUTO_HIDE) {
-                        delayedHide(AUTO_HIDE_DELAY_MILLIS);
-                    }
-                    break;
-                case MotionEvent.ACTION_UP:
-                    view.performClick();
-                    break;
-                default:
-                    break;
-            }
-            return false;
-        }
-    };
+    private final Runnable mHideRunnable = () -> hide();
     private ActivityFullscreenBinding binding;
 
     @Override
@@ -118,57 +87,130 @@ public class FullscreenActivity extends AppCompatActivity {
             binding = ActivityFullscreenBinding.inflate(getLayoutInflater());
             setContentView(binding.getRoot());
 
-            mVisible = true;
-            mControlsView = binding.fullscreenContentControls;
             mContentView = binding.fullscreenContent;
-
-            // Set up the user interaction to manually show or hide the system UI.
-            mContentView.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    toggle();
-                }
-            });
-
-            // Upon interacting with UI controls, delay any scheduled hide()
-            // operations to prevent the jarring behavior of controls going away
-            // while interacting with the UI.
-            binding.dummyButton.setOnTouchListener(mDelayHideTouchListener);
 
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 
-            WeatherApi.getWeatherData(
-                59.30852649750069,
-                18.02908000662675,
-                weatherResponse -> {
-                    if (weatherResponse != null && !weatherResponse.properties.timeseries.isEmpty()) {
-                        WeatherResponse.Details instantData = weatherResponse
-                            .properties
-                            .timeseries.get(0)
-                            .data
-                            .instant
-                            .details;
-                        WeatherResponse.Units units = weatherResponse.properties.meta.units;
+//            WeatherApi.getWeatherData(
+//                59.30852649750069,
+//                18.02908000662675,
+//                weatherResponse -> {
+//                    if (weatherResponse != null && !weatherResponse.properties.timeseries.isEmpty()) {
+//                        WeatherResponse.Details instantData = weatherResponse
+//                            .properties
+//                            .timeseries.get(0)
+//                            .data
+//                            .instant
+//                            .details;
+//                        WeatherResponse.Units units = weatherResponse.properties.meta.units;
+//
+//                        TextView fullscreenTextView = findViewById(R.id.fullscreen_content);
+//                        fullscreenTextView.setText("hello");
+////                        fullscreenTextView.setText(
+////                            "air_pressure_at_sea_level: " + instantData.air_pressure_at_sea_level + " " + units.air_pressure_at_sea_level + "\n" +
+////                            "air_temperature: " + instantData.air_temperature + " " + units.air_temperature + "\n" +
+////                            "cloud_area_fraction: " + instantData.cloud_area_fraction + " " + units.cloud_area_fraction + "\n" +
+////                            "relative_humidity: " + instantData.relative_humidity + " " + units.relative_humidity + "\n" +
+////                            "wind_from_direction: " + instantData.wind_from_direction + " " + units.wind_from_direction + "\n" +
+////                            "wind_speed: " + instantData.wind_speed + " " + units.wind_speed
+////                        );
+//                    } else {
+//                        System.out.println("Failed to retrieve weather data.");
+//                    }
+//                }
+//            );
+            LinearLayout temperatureContainer = findViewById(R.id.temperatureContainer);
+            temperatureContainer.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+                @Override
+                public void onGlobalLayout() {
+                    // Remove the observer to avoid multiple calls
+                    temperatureContainer.getViewTreeObserver().removeOnGlobalLayoutListener(this);
 
-                        TextView fullscreenTextView = findViewById(R.id.fullscreen_content);
-                        fullscreenTextView.setText(
-                            "air_pressure_at_sea_level: " + instantData.air_pressure_at_sea_level + " " + units.air_pressure_at_sea_level + "\n" +
-                            "air_temperature: " + instantData.air_temperature + " " + units.air_temperature + "\n" +
-                            "cloud_area_fraction: " + instantData.cloud_area_fraction + " " + units.cloud_area_fraction + "\n" +
-                            "relative_humidity: " + instantData.relative_humidity + " " + units.relative_humidity + "\n" +
-                            "wind_from_direction: " + instantData.wind_from_direction + " " + units.wind_from_direction + "\n" +
-                            "wind_speed: " + instantData.wind_speed + " " + units.wind_speed
-                        );
-                    } else {
-                        System.out.println("Failed to retrieve weather data.");
-                    }
+                    int tempHeight = temperatureContainer.getHeight();
+
+                    addTempsToContainer(temperatureContainer, tempHeight);
+                    // Now you can use the parentHeight as needed
                 }
-            );
+            });
+
+
         } catch (Exception ex) {
             System.err.println("Something went wrong: " + ex);
             ex.printStackTrace();
         }
     }
+
+    private void addTempsToContainer(LinearLayout temperatureContainer, int tempHeight) {
+
+        TextView fullscreenTextView = findViewById(R.id.fullscreen_content);
+        fullscreenTextView.setText("hello");
+
+
+
+        List<Integer> temperatures = new ArrayList<>();
+        for (int i = 1; i <= 100; i++) {
+            temperatures.add(i);
+        }
+        int textWidgetSize = 60;
+        int totalHeight = tempHeight - 4 * textWidgetSize;
+
+        int maxTemp = Integer.MIN_VALUE;
+        int minTemp = Integer.MAX_VALUE;
+        for (int t: temperatures) {
+            maxTemp = Math.max(maxTemp, t);
+            minTemp = Math.min(minTemp, t);
+        }
+        int tempDiff = maxTemp - minTemp;
+        for (int temperature : temperatures) {
+            LinearLayout wrapperLayout = new LinearLayout(this);
+            wrapperLayout.setOrientation(LinearLayout.VERTICAL);
+
+            TextView textView = new TextView(this);
+            textView.setText(String.valueOf(temperature));
+            textView.setTextColor(Color.WHITE);
+            textView.setTextSize(60);
+            textView.setGravity(Gravity.CENTER);
+
+            int strokeWidth = 5;
+            int roundRadius = 15;
+            int strokeColor = Color.BLUE;
+            int fillColor = Color.BLUE;
+
+            GradientDrawable gd = new GradientDrawable();
+            gd.setColor(fillColor);
+            gd.setCornerRadius(roundRadius);
+            gd.setStroke(strokeWidth, strokeColor);
+            gd.setAlpha(0);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                wrapperLayout.setBackground(gd);
+            } else {
+                wrapperLayout.setBackgroundDrawable(gd);
+            }
+
+            wrapperLayout.addView(textView);
+            LinearLayout.LayoutParams wrapperParams = new LinearLayout.LayoutParams(
+                250,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+
+            float percentage = 1f - ((float)temperature - (float)minTemp) / (float)tempDiff;
+            int parentHeight = totalHeight;
+            int height = (int) (parentHeight * percentage);
+
+            int height2 = Integer.valueOf(temperature) * 20;
+            System.out.println("percentage: " + percentage);
+            System.out.println("parentHeight: " + parentHeight);
+            System.out.println("height: " + height);
+            System.out.println("height2: " + height2);
+            System.out.println();
+            wrapperParams.setMargins(0, height, 0, 0);
+            wrapperLayout.setLayoutParams(wrapperParams);
+
+            temperatureContainer.addView(wrapperLayout);
+        }
+    }
+
 
     @Override
     protected void onPostCreate(Bundle savedInstanceState) {
@@ -180,42 +222,16 @@ public class FullscreenActivity extends AppCompatActivity {
         delayedHide(100);
     }
 
-    private void toggle() {
-        if (mVisible) {
-            hide();
-        } else {
-            show();
-        }
-    }
-
     private void hide() {
         // Hide UI first
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
             actionBar.hide();
         }
-        mControlsView.setVisibility(View.GONE);
-        mVisible = false;
 
         // Schedule a runnable to remove the status and navigation bar after a delay
         mHideHandler.removeCallbacks(mShowPart2Runnable);
         mHideHandler.postDelayed(mHidePart2Runnable, UI_ANIMATION_DELAY);
-    }
-
-    private void show() {
-        // Show the system bar
-        if (Build.VERSION.SDK_INT >= 30) {
-            mContentView.getWindowInsetsController().show(
-                    WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
-        } else {
-            mContentView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
-        }
-        mVisible = true;
-
-        // Schedule a runnable to display UI elements after a delay
-        mHideHandler.removeCallbacks(mHidePart2Runnable);
-        mHideHandler.postDelayed(mShowPart2Runnable, UI_ANIMATION_DELAY);
     }
 
     /**
